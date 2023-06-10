@@ -1,13 +1,13 @@
 #include <WiFiNINA.h>
 
 // WiFi and InfluxDB credentials
-const char ssid[] = "";
-const char password[] = "";
-const char server[] = "";
+const char* ssid = "";
+const char* password = "";
+const char* server = "";
 const int port = 8086; // default InfluxDB v2 port is 8086
-const char org[] = "home";
-const char bucket[] = "bucket";
-const char token[] = "";
+const char* org = "home";
+const char* bucket = "bucket";
+const char* token = "";
 
 const float ADC_mV = 4.8828125;
 const float SensorOffset = 200.0;
@@ -48,6 +48,17 @@ void setup() {
 }
 
 void loop() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Lost WiFi connection, reconnecting...");
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(1000);
+      Serial.print(".");
+    }
+    Serial.println();
+    Serial.println("Reconnected to WiFi");
+  }
+
   unsigned long currentMillis = millis();
 
   if (currentMillis - previousMillis >= interval) {
@@ -76,15 +87,15 @@ void loop() {
 
 void sendDataToInfluxDB(float average) {
   if (wifiClient.connect(server, port)) {
-    String postData = String("Pressure_Sensor,host=arduino_mkr1010 average=") + String(average);
-    String postRequest =
-      "POST /api/v2/write?org=" + String(org) + "&bucket=" + String(bucket) + "&precision=s HTTP/1.1\r\n" +
-      "Host: " + String(server) + "\r\n" +
-      "Authorization: Token " + String(token) + "\r\n" +
-      "Content-Length: " + String(postData.length()) + "\r\n" +
-      "Content-Type: text/plain\r\n" +
-      "Connection: close\r\n\r\n" +
-      postData;
+    char postRequest[256];
+    snprintf(postRequest, sizeof(postRequest),
+             "POST /api/v2/write?org=%s&bucket=%s&precision=s HTTP/1.1\r\n"
+             "Host: %s\r\n"
+             "Authorization: Token %s\r\n"
+             "Content-Type: text/plain\r\n"
+             "Connection: close\r\n\r\n"
+             "Pressure_Sensor,host=arduino_mkr1010 average=%.2f\r\n",
+             org, bucket, server, token, average);
 
     wifiClient.println(postRequest);
 
